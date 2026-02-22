@@ -1,0 +1,12 @@
+# Compiled binary
+ingress-audit
+
+# Report output files
+ingress-audit-*.txt
+ingress-audit-*.json
+
+# macOS
+.DS_Store
+
+# Go build cache
+*.test
