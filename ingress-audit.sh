@@ -87,22 +87,22 @@ writeln() {
 
 log_pass() {
   writeln "${GREEN}✓ PASS${RESET}: $1"
-  ((PASS_COUNT++))
+  ((PASS_COUNT++)) || true
 }
 
 log_fail() {
   writeln "${RED}✗ FAIL${RESET}: $1"
-  ((FAIL_COUNT++))
+  ((FAIL_COUNT++)) || true
 }
 
 log_warn() {
   writeln "${YELLOW}⚠ WARN${RESET}: $1"
-  ((WARN_COUNT++))
+  ((WARN_COUNT++)) || true
 }
 
 log_info() {
   writeln "${BLUE}ℹ INFO${RESET}: $1"
-  ((INFO_COUNT++))
+  ((INFO_COUNT++)) || true
 }
 
 log_step() {
@@ -127,6 +127,10 @@ print_section() {
 or_default() {
   local s="${1:-}"
   [[ -n "$s" ]] && printf '%s' "$s" || printf 'not-set'
+}
+
+to_lower() {
+  printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]'
 }
 
 extract_version() {
@@ -225,9 +229,9 @@ prompt_user() {
   local default_val="${2:-}"
   local input
   if [[ -n "$default_val" ]]; then
-    printf "  %b%s%b [default: %b%s%b]: " "$BOLD" "$prompt" "$RESET" "$CYAN" "$default_val" "$RESET"
+    printf "  %b%s%b [default: %b%s%b]: " "$BOLD" "$prompt" "$RESET" "$CYAN" "$default_val" "$RESET" >&2
   else
-    printf "  %b%s%b: " "$BOLD" "$prompt" "$RESET"
+    printf "  %b%s%b: " "$BOLD" "$prompt" "$RESET" >&2
   fi
   IFS= read -r input
   input="${input//[$'\r\n']/}"
@@ -326,7 +330,7 @@ pick_namespace() {
       continue
     fi
 
-    if [[ "$input" == "0" || "${input,,}" == "all" ]]; then
+    if [[ "$input" == "0" || "$(to_lower "$input")" == "all" ]]; then
       SCAN_ALL=true
       NAMESPACES=("${nginx_ns[@]}")
       printf "\n  %bSelected: ALL %d ingress-nginx namespace(s)%b\n" "$GREEN" "${#nginx_ns[@]}" "$RESET"
@@ -691,8 +695,8 @@ audit_admission_controller() {
       log_fail "✗ CRITICAL: Admission controller exposed via LoadBalancer!"
       log_info "External IP: ${ADMISSION_EXTERNAL_IP}"
       writeln "  IMMEDIATE REMEDIATION:"
-      writeln "    kubectl patch svc ingress-nginx-controller-admission \\\" 
-      writeln "      -n ${NAMESPACE} \\\" 
+      writeln "    kubectl patch svc ingress-nginx-controller-admission \\\\"
+      writeln "      -n ${NAMESPACE} \\\\"
       writeln "      -p '{\"spec\":{\"type\":\"ClusterIP\"}}'"
       add_fix "admission-loadbalancer" "CRITICAL" \
         "Change admission controller service from LoadBalancer → ClusterIP" \
@@ -704,8 +708,8 @@ audit_admission_controller() {
       node_port=$(kubectl_out get svc -n "$NAMESPACE" ingress-nginx-controller-admission -o jsonpath='{.spec.ports[0].nodePort}')
       log_fail "✗ CRITICAL: Admission controller exposed via NodePort ${node_port}!"
       writeln "  IMMEDIATE REMEDIATION:"
-      writeln "    kubectl patch svc ingress-nginx-controller-admission \\\" 
-      writeln "      -n ${NAMESPACE} \\\" 
+      writeln "    kubectl patch svc ingress-nginx-controller-admission \\\\"
+      writeln "      -n ${NAMESPACE} \\\\"
       writeln "      -p '{\"spec\":{\"type\":\"ClusterIP\"}}'"
       writeln "\n  Exposed on nodes:"
       kubectl_out get nodes -o custom-columns=NAME:.metadata.name,INTERNAL-IP:.status.addresses[0].address --no-headers \
@@ -884,7 +888,7 @@ audit_network_security() {
     while IFS= read -r line; do
       [[ -z "$line" ]] && continue
       log_info "  ${line}"
-      ((found++))
+      ((found++)) || true
     done < <(jq -r '.items[] | select(.spec.type=="LoadBalancer" or .spec.type=="NodePort") | "\(.metadata.namespace)/\(.metadata.name) (\(.spec.type))"' <<< "$svc_json")
     if (( found == 0 )); then
       log_info "No LoadBalancer or NodePort services found"
@@ -1323,7 +1327,7 @@ generate_summary() {
   while IFS= read -r rec; do
     [[ -z "$rec" ]] && continue
     writeln "    ${idx}. ${rec}"
-    ((idx++))
+    ((idx++)) || true
   done < <(build_recommendations_json | jq -r '.[]')
 
   writeln ""
@@ -1435,7 +1439,7 @@ offer_fixes() {
   printf "  %bDo you want to apply all fixes? [yes/no]:%b " "$BOLD" "$RESET"
   local answer
   IFS= read -r answer
-  answer="${answer,,}"
+  answer="$(to_lower "$answer")"
   answer="${answer//[$'\r\n']/}"
 
   if [[ "$answer" != "yes" && "$answer" != "y" ]]; then
@@ -1460,7 +1464,7 @@ offer_fixes() {
       elapsed=$((end - start))
       printf "\n  %b✓ DONE%b (%ss)\n" "${GREEN}${BOLD}" "$RESET" "$elapsed"
       results+=("PASS|${FIX_DESCRIPTIONS[$i]}")
-      ((passed++))
+      ((passed++)) || true
 
       case "${FIX_IDS[$i]}" in
         snippet-annotations|resource-limits)
@@ -1478,7 +1482,7 @@ offer_fixes() {
       elapsed=$((end - start))
       printf "\n  %b✗ FAILED%b (%ss): command failed\n" "${RED}${BOLD}" "$RESET" "$elapsed"
       results+=("FAIL|${FIX_DESCRIPTIONS[$i]}")
-      ((failed++))
+      ((failed++)) || true
     fi
   done
 
@@ -1556,7 +1560,7 @@ run_multi_namespace_scan() {
     fi
 
     if ! run_single_namespace "$ns" "$ts"; then
-      ((total_fail++))
+      ((total_fail++)) || true
     fi
   done
 
