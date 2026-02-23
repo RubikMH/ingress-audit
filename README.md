@@ -2,14 +2,18 @@
 
 A terminal-based security auditor for **ingress-nginx** controllers running on Kubernetes. It runs nine audit phases, prints a colour-coded report, optionally applies fixes, and writes both a plain-text and a structured JSON report to disk.
 
+You can run it directly as a single Bash script (`ingress-audit.sh`) — no Go installation required.
+
 ---
 
 ## Requirements
 
 | Tool | Purpose |
 |------|---------|
+| `bash` (v4+) | Run the single-file auditor script |
 | `kubectl` | Query the cluster (must be configured and authenticated) |
 | `helm` *(optional)* | Detect Helm chart version / release status |
+| `jq` | Parse Kubernetes/Helm JSON output |
 | `openssl` *(optional)* | Parse TLS certificate expiry dates |
 | Go 1.21+ | Only needed if building from source |
 
@@ -18,6 +22,17 @@ A terminal-based security auditor for **ingress-nginx** controllers running on K
 ---
 
 ## Installation
+
+### Run as a single Bash script (recommended)
+
+```bash
+git clone https://github.com/RubikMH/ingress-audit.git
+cd ingress-audit
+chmod +x ingress-audit.sh
+./ingress-audit.sh
+```
+
+This mode is self-contained and does not require Go.
 
 ### Build from source
 
@@ -38,6 +53,12 @@ go run .
 ## Usage
 
 ```bash
+./ingress-audit.sh
+```
+
+If you built from source, you can also run:
+
+```bash
 ./ingress-audit
 ```
 
@@ -49,6 +70,18 @@ The tool is fully interactive — no flags required. On launch it:
 4. Runs all nine audit phases and prints results live.
 5. Writes two report files to the current directory.
 6. Offers to apply any auto-fixable issues (press `y` to apply, `n` to skip each one).
+
+### Use a different domain
+
+When you run `./ingress-audit.sh`, enter your own domain at the first prompt:
+
+```text
+Your domain (e.g. rubikmh.io) [default: rubikmh.io]: yourdomain.com
+```
+
+- Press **Enter** to use the default (`rubikmh.io`).
+- Type any other domain (for example `example.org`) and press **Enter** to use that domain for the current audit run.
+- The selected domain is used in log output and generated reports.
 
 ### Interactive prompts
 
@@ -204,6 +237,7 @@ Test coverage spans `util.go` (pure functions), `shell.go` (binary detection, AN
 
 ```
 ingress-audit/
+├── ingress-audit.sh          # Single-file Bash auditor (no Go required)
 ├── main.go                   # Entry point, runAudit, runMultiNamespaceScan
 ├── colors.go                 # ANSI color constants
 ├── ui.go                     # Lipgloss box renderer
@@ -232,6 +266,7 @@ ingress-audit/
 
 ## Notes
 
+- The fastest way to run is `./ingress-audit.sh`.
 - The tool requires a **working kubeconfig** (`~/.kube/config` or `KUBECONFIG` env var).
 - It only reads from the cluster — no writes happen unless you explicitly approve a fix.
 - The admission controller exposure check directly relates to **AbuseBSI CB-Report#20260218-10009947**.
